@@ -65,7 +65,7 @@ col_pal <- colorNumeric(palette = "Blues", domain = combined_data$proportion_vax
 
 map_labels <- paste(
   "County Name: ", combined_data$CTY_NAME, "<br>", 
-  "Percentage Vaccinated: ", paste0(sprintf("%.1f", combined_data$proportion_vaxxed), "%")) %>% lapply(htmltools::HTML)
+  "Percent Vaccinated: ", paste0(sprintf("%.1f", combined_data$proportion_vaxxed), "%")) %>% lapply(htmltools::HTML)
 
 
 #Add doses administered per week
@@ -88,11 +88,6 @@ Row {data-width=650}
 ### COVID-19 Vaccine Doses Administered Per Week
 
 ```{r}
-# plot_ly(doses_data, type = 'scatter', mode = 'lines')%>%
-#   add_trace(x = ~admin_week, y = ~doses_administered_per_week, name = 'Weekly Doses', 
-#             line = list(color = 'rgb(0, 56, 101)'))%>%
-#   layout(showlegend = F)
-
 p <- ggplot(doses_data, aes(x=`Week of Administration`, y=`Doses Administered Per Week`, group = 1)) +
   geom_line(color = "#003865") + 
   xlab("") + 
@@ -113,7 +108,7 @@ ggplotly(p)
 Row {data-width=350, data-height=700}
 -----------------------------------------------------------------------
 
-### Percent of Total Population with Complete COVID-19 Vaccine Series
+### Percent of Population by County with Complete COVID-19 Vaccine Series
 
 ```{r results="asis"}
 cat("
@@ -138,7 +133,7 @@ leaflet(combined_data) %>%
   setView(-94.228322, 46.392410, zoom = 6)
 ```
 
-### Percent Vaccinated
+### Percent of Population Vaccinated
 
 ```{r}
 df <- data.frame(matrix(nrow = 2, ncol = 3))
