@@ -5,3 +5,5 @@ This is a mockup of a vaccine dashboard, similar to the types of dashboards bein
 Minnesota population numbers are from https://mn.gov/admin/assets/mn_county_estimates_sdc_2019_tcm36-442553.xlsx.
 
 This dashboard was built in R using R markdown and the flexdashboard package. The interactive time-series graph is built using plotly and ggplot. The interactive choropleth map is built using the Leaflet library. 
+
+A live demo of the dashboard can be viewed on RPubs here: https://rpubs.com/dennislduffy/vaccine-mockup.
