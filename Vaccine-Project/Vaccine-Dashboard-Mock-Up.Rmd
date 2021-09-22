@@ -1,0 +1,167 @@
+---
+title: "Vaccine Dashboard Mockup"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(sf)
+library(maptools)
+library(leaflet)
+library(plotly)
+library(lubridate)
+```
+
+```{r, include = FALSE}
+#clean up data and combine
+mn_shape <- read_sf(paste0(getwd(), "/shp_bdry_counties_in_minnesota/mn_county_boundaries_500.shp")) %>%
+  sf::st_transform('+proj=longlat +datum=WGS84')
+#Shapefile acccessed from: https://gisdata.mn.gov/dataset/bdry-counties-in-minnesota
+
+raw_vaccine <- read_csv(paste0(getwd(), "/vaccination-county-covid.csv")) #data accessed from https://mn.gov/covid19/assets/People%20Vaccinated%2C%20By%20County_tcm1148-467651.csv on 9/18/21
+
+raw_population <- read_xlsx(paste0(getwd(), "/mn_county_estimates_sdc_2019_tcm36-442553.xlsx"), sheet = "COUNTY_ESTIMATES_2019")
+  #Data found at https://mn.gov/admin/assets/mn_county_estimates_sdc_2019_tcm36-442553.xlsx
+
+#clean up vaccine data 
+vaccine_data <- raw_vaccine %>%
+  clean_names() %>%
+  rename("one_dose" = "people_with_at_least_one_vaccine_dose", 
+         "complete_series" = "people_with_completed_vaccine_series") %>%
+  dplyr::select(county, one_dose, complete_series) %>%
+  filter(county != "UNKNOWN/MISSING")
+
+vaccine_data$county <- tolower(vaccine_data$county)
+
+#prep population estimates from 2019
+population_data <- raw_population %>%
+  clean_names() %>%
+  dplyr::select(county_name, total_population_2019, county_code)
+
+population_data$county_name <- tolower(population_data$county_name)
+
+#combine population and vaccination data
+combined_data <- population_data %>%
+  left_join(vaccine_data, by = c("county_name" = "county")) %>%
+  filter(is.na(county_name) == F) %>%
+  mutate(NAME_1 = "Minnesota", 
+         proportion_vaxxed = complete_series / total_population_2019 * 100)
+
+#prepare shape file and combine with vaccine and population data 
+mn_shape$CTY_MATCH <- tolower(mn_shape$CTY_NAME)
+
+combined_data <- mn_shape %>%
+  left_join(combined_data, c("CTY_MATCH" = "county_name"))
+
+
+#create color palette
+col_pal <- colorNumeric(palette = "Blues", domain = combined_data$proportion_vaxxed)
+
+map_labels <- paste(
+  "County Name: ", combined_data$CTY_NAME, "<br>", 
+  "Percentage Vaccinated: ", paste0(sprintf("%.1f", combined_data$proportion_vaxxed), "%")) %>% lapply(htmltools::HTML)
+
+
+#Add doses administered per week
+raw_doses <- read.csv(paste0(getwd(), "/Doses Administered By Week_tcm1148-462844.csv"))
+
+doses_data <- raw_doses %>%
+  clean_names() %>%
+  filter(week_start_date != "Unknown/missing") %>%
+  mutate(admin_week = mdy(week_start_date)) %>%
+  dplyr::select(admin_week, doses_administered_per_week) %>%
+  rename(`Week of Administration` = admin_week, 
+         `Doses Administered Per Week` = doses_administered_per_week)
+  
+```
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### COVID-19 Vaccine Doses Administered Per Week
+
+```{r}
+# plot_ly(doses_data, type = 'scatter', mode = 'lines')%>%
+#   add_trace(x = ~admin_week, y = ~doses_administered_per_week, name = 'Weekly Doses', 
+#             line = list(color = 'rgb(0, 56, 101)'))%>%
+#   layout(showlegend = F)
+
+p <- ggplot(doses_data, aes(x=`Week of Administration`, y=`Doses Administered Per Week`, group = 1)) +
+  geom_line(color = "#003865") + 
+  xlab("") + 
+  scale_color_manual(values = "#003865") + 
+  theme_bw() + 
+  theme(strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid.major = element_blank())+
+  guides(fill=FALSE) +
+  guides(colour=FALSE)
+
+ggplotly(p)
+```
+
+Row {data-width=350, data-height=700}
+-----------------------------------------------------------------------
+
+### Percent of Total Population with Complete COVID-19 Vaccine Series
+
+```{r results="asis"}
+cat("
+<style>
+.leaflet-container {
+    background: #FFF;
+}
+</style>
+")
+```
+
+```{r}
+leaflet(combined_data) %>%
+  addPolygons(
+    fillColor = ~col_pal(combined_data$proportion_vaxxed), 
+    stroke = TRUE, 
+    color = 'White', 
+    fillOpacity = 1,
+    weight = 1, 
+    label = map_labels
+  ) %>%
+  setView(-94.228322, 46.392410, zoom = 6)
+```
+
+### Percent Vaccinated
+
+```{r}
+df <- data.frame(matrix(nrow = 2, ncol = 3))
+names(df) <- c("measure", "percentage", "label")
+df$measure <- c("percent_complete", "percent_one_dose")
+df$percentage <- c(sum(combined_data$complete_series)/sum(combined_data$total_population_2019), 
+                   sum(combined_data$one_dose)/sum(combined_data$total_population_2019))
+df$label <- paste0(sprintf("%.1f", df$percentage*100), "%")
+df$graph_text <- c("Percent Completely \n Vaccinated", "Percent with at \n Least One Dose")
+
+ggplot(df, aes(ymax = percentage, ymin = 0, xmax = 2, xmin = 1)) +
+ geom_rect(aes(ymax=1, ymin=0, xmax=2, xmin=1), fill = "#FFFFFF", color="black") +
+ geom_rect(fill = "#003865") + 
+ coord_polar(theta = "y",start=-pi/2) + xlim(c(0, 2)) + ylim(c(0,2)) +
+ geom_text(aes(x = 0, y = 0, label = label), size=6.5) +
+ geom_text(aes(x=1.5, y=1.5, label=graph_text), size=4.2) + 
+ facet_wrap(~measure, nrow = 2) +
+ theme_void() + 
+ theme(strip.background = element_blank(),
+ strip.text.x = element_blank()) +
+ guides(fill=FALSE) +
+ guides(colour=FALSE)
+
+```
+
+
