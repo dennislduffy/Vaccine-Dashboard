@@ -91,6 +91,7 @@ Row {data-width=650}
 p <- ggplot(doses_data, aes(x=`Week of Administration`, y=`Doses Administered Per Week`, group = 1)) +
   geom_line(color = "#003865") + 
   xlab("") + 
+  ylab("") +
   scale_color_manual(values = "#003865") + 
   theme_bw() + 
   theme(strip.background = element_blank(),
@@ -130,7 +131,7 @@ leaflet(combined_data) %>%
     weight = 1, 
     label = map_labels
   ) %>%
-  setView(-94.228322, 46.392410, zoom = 6)
+  setView(-94.228322, 46.392410, zoom = 5)
 ```
 
 ### Percent of Population Vaccinated
